@@ -10,7 +10,7 @@
 ;;         Does not yet work in XEmacs.
 ;; Created: 1995-03-03
 
-;; $Id: flash-paren.el,v 1.16 2000/02/27 23:20:46 friedman Exp $
+;; $Id: flash-paren.el,v 1.17 2015/02/18 21:38:28 friedman Exp $
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -23,9 +23,7 @@
 ;; GNU General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program; if not, you can either send email to this
-;; program's maintainer or write to: The Free Software Foundation,
-;; Inc.; 59 Temple Place, Suite 330; Boston, MA 02111-1307, USA.
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -176,6 +174,15 @@ the mode, respectively."
        ;; of which will cause a call to post-command-hook; so as long as
        ;; the keyboard macro is still executing, do nothing.
        (not executing-kbd-macro)
+
+       ;; In Emacs 24.3 or later, the lisp function sit-for calls
+       ;; read-event which pushes any keyboard event read onto
+       ;; unread-command-events in the form (t . EVENT).  But other event
+       ;; reading functions don't process this transparently and so (for
+       ;; example) y-or-n-p doesn't get back a response it ever expects
+       ;; from read-string.  Since if the cursor is in the echo area it's
+       ;; not at the bound of a sexp anyway, just don't proceed here.
+       (not cursor-in-echo-area)
 
        ;; prefix args do strange things with commands; it seems that
        ;; running post-command-hook after invoking one of these is delayed
