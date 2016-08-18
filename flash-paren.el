@@ -1,6 +1,10 @@
 ;;; flash-paren.el --- flash matching parens a la Zmacs
 
-;; Copyright (C) 1995, 1997, 1999 Noah S. Friedman
+;; Author: Noah Friedman <friedman@splode.com>
+;; Created: 1995-03-03
+;; Public domain.
+
+;; $Id: flash-paren.el,v 1.18 2016/07/28 06:27:19 friedman Exp $
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Maintainer: friedman@splode.com
@@ -8,28 +12,16 @@
 ;; Status: Fully supported in Emacs 20 and later.
 ;;         Works in Emacs 19 with customs-1.9960 package loaded.
 ;;         Does not yet work in XEmacs.
-;; Created: 1995-03-03
-
-;; $Id: flash-paren.el,v 1.17 2015/02/18 21:38:28 friedman Exp $
-
-;; This program is free software; you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation; either version 2, or (at your option)
-;; any later version.
-;;
-;; This program is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-;;
-;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
 ;; Loading this makes emacs's paren blinking behavior more closely
 ;; approximate the behavior of Zmacs.  It should work under X or on ascii
 ;; terminals.
+
+;; Fully supported in Emacs 20 and later.
+;; Works in Emacs 19 with customs-1.9960 package loaded.
+;; Does not work in XEmacs.
 
 ;; To use this program, load this file and do: (flash-paren-mode 1)
 
@@ -100,6 +92,31 @@ support floating point arguments to `sit-for'."
 ;; idle time delay currently in use by timer.
 ;; This is used to determine if flash-paren-delay is changed by the user.
 (defvar flash-paren-current-delay flash-paren-delay)
+
+
+;; macros and aliases
+
+;; while-no-input was introduced in Emacs 22.1.
+;; For earlier versions just wrap body in progn.
+(defmacro flash-paren-while-no-input (&rest body)
+  (declare (debug 1) (indent 0))
+  (cons (if (fboundp 'while-no-input)
+            'while-no-input
+          'progn)
+        body))
+
+;; matching-paren wasn't defined in emacs until version 19.26.
+(defalias 'flash-paren-matching-paren
+  (if (fboundp 'matching-paren)
+      'matching-paren
+    (lambda (c)
+      (and (memq (char-syntax c) '(?\( ?\)))
+           (lsh (aref (syntax-table) c) -8)))))
+
+(defalias 'flash-paren-characterp
+  (if (fboundp 'characterp)
+      'characterp
+    'integerp))
 
 
 ;;;###autoload
@@ -309,10 +326,30 @@ the mode, respectively."
     ;; Only affect display of selected window.
     (overlay-put ovl 'window (selected-window))
     (unwind-protect
-        (while (and (= (point) opoint)
-                    (sit-for flash-paren-delay))
-          (overlay-put ovl 'face (if flash-paren-visible-p on-face off-face))
-          (setq flash-paren-visible-p (not flash-paren-visible-p)))
+        ;; If we can avoid it, don't use `sit-for'.  In Emacs 22 and later
+        ;; it pauses by using `read-event' (which blocks) and then pushes
+        ;; any event read onto `unread-command-events'.  This frequently
+        ;; doesn't work right; see comments above `sit-for' in subr.el for
+        ;; references to some of the bugs it causes.
+        ;;
+        ;; Instead, use `sleep-for'.  For this to work we have to do a
+        ;; redisplay ourselves and also check if input is pending.
+        ;; `sleep-for' is normally not interruptible by input, so we use
+        ;; `while-no-input' to abort it early if input arrives.  This macro
+        ;; and `redisplay' were introduced at the same time in Emacs 22.1,
+        ;; so `sit-for' handles the earlier versions of emacs and
+        ;; `while-no-input'/`sleep-for' handles everything else.
+        (flash-paren-while-no-input
+          (while (and (= (point) opoint)
+                      (cond ((fboundp 'redisplay)
+                             (redisplay t)
+                             (sleep-for flash-paren-delay)
+                             ;; let other timers run since we're being greedy
+                             (not (input-pending-p t)))
+                            (t
+                             (sit-for flash-paren-delay))))
+            (overlay-put ovl 'face (if flash-paren-visible-p on-face off-face))
+            (setq flash-paren-visible-p (not flash-paren-visible-p))))
       (delete-overlay ovl))))
 
 (defun flash-paren-do-flash-get-overlay-face (mpoint)
@@ -513,18 +550,6 @@ the mode, respectively."
     (and (fboundp 'set-marker-insertion-type)
          (set-marker-insertion-type new-marker insertion-type))
     new-marker))
-
-;; matching-paren wasn't defined in emacs until version 19.26.
-(if (fboundp 'matching-paren)
-    (defalias 'flash-paren-matching-paren 'matching-paren)
-  (defun flash-paren-matching-paren (c)
-    (and (memq (char-syntax c) '(?\( ?\)))
-         (lsh (aref (syntax-table) c) -8))))
-
-(defalias 'flash-paren-characterp
-  (if (fboundp 'characterp)
-      'characterp
-    'integerp))
 
 (provide 'flash-paren)
 
