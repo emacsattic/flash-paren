@@ -4,7 +4,7 @@
 ;; Created: 1995-03-03
 ;; Public domain.
 
-;; $Id: flash-paren.el,v 1.18 2016/07/28 06:27:19 friedman Exp $
+;; $Id: flash-paren.el,v 1.19 2016/07/30 05:30:43 friedman Exp $
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Maintainer: friedman@splode.com
@@ -502,7 +502,8 @@ the mode, respectively."
 (defun flash-paren-background-at-pos (pos)
   (let ((prop (get-char-property pos 'face)))
     (cond ((flash-paren-face-background prop))
-          ((and (listp prop)
+          ((and (consp prop)
+                (consp (car prop))
                 (cdr (assq 'background-color prop))))
           ((flash-paren-face-background 'default))
           ((let* ((fp (frame-parameters))
