@@ -4,7 +4,7 @@
 ;; Created: 1995-03-03
 ;; Public domain.
 
-;; $Id: flash-paren.el,v 1.19 2016/07/30 05:30:43 friedman Exp $
+;; $Id: flash-paren.el,v 1.20 2018/02/03 00:25:52 friedman Exp $
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Maintainer: friedman@splode.com
@@ -313,6 +313,7 @@ the mode, respectively."
   (opoint mpoint &optional blink-only)
   (let ((flash-paren-visible-p nil)
         (ovl (make-overlay mpoint (1+ mpoint)))
+        (win (selected-window))
         (on-face (cond ((and (not blink-only)
                              (facep 'flash-paren-face-on)
                              (face-nontrivial-p 'flash-paren-face-on))
@@ -324,7 +325,7 @@ the mode, respectively."
                          'flash-paren-face-off)
                         (t (flash-paren-do-flash-get-overlay-face mpoint)))))
     ;; Only affect display of selected window.
-    (overlay-put ovl 'window (selected-window))
+    (overlay-put ovl 'window win)
     (unwind-protect
         ;; If we can avoid it, don't use `sit-for'.  In Emacs 22 and later
         ;; it pauses by using `read-event' (which blocks) and then pushes
@@ -348,6 +349,7 @@ the mode, respectively."
                              (not (input-pending-p t)))
                             (t
                              (sit-for flash-paren-delay))))
+            (select-window win)
             (overlay-put ovl 'face (if flash-paren-visible-p on-face off-face))
             (setq flash-paren-visible-p (not flash-paren-visible-p))))
       (delete-overlay ovl))))
